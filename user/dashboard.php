@@ -412,7 +412,14 @@ include '../includes/header.php';
                         </h5>
                     </div>
                     <div class="card-body">
-                        <canvas id="userChart" height="100"></canvas>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <canvas id="userLineChart" height="120"></canvas>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <canvas id="userBarChart" height="120"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -468,58 +475,89 @@ include '../includes/header.php';
 
 <script>
     <?php if (!empty($user_chart_data)): ?>
-    // User Request History Chart
-    const userCtx = document.getElementById('userChart').getContext('2d');
-    new Chart(userCtx, {
-        type: 'bar',
+    // User Request History Charts (Line + Bar)
+    const userLabels = [<?php echo "'" . implode("','", array_reverse(array_column($user_chart_data, 'month_name'))) . "'"; ?>];
+    const userTotal = [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'total_requests'))); ?>];
+    const userApproved = [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'approved'))); ?>];
+    const userRejected = [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'rejected'))); ?>];
+    const userPending = [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'pending'))); ?>];
+
+    // Line chart
+    const userLineCtx = document.getElementById('userLineChart').getContext('2d');
+    new Chart(userLineCtx, {
+        type: 'line',
         data: {
-            labels: [<?php echo "'" . implode("','", array_reverse(array_column($user_chart_data, 'month_name'))) . "'"; ?>],
+            labels: userLabels,
             datasets: [{
                 label: 'Total Requests',
-                data: [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'total_requests'))); ?>],
-                backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                data: userTotal,
                 borderColor: '#28a745',
-                borderWidth: 1
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                fill: true
             }, {
                 label: 'Approved',
-                data: [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'approved'))); ?>],
-                backgroundColor: 'rgba(0, 123, 255, 0.8)',
+                data: userApproved,
                 borderColor: '#007bff',
-                borderWidth: 1
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4,
+                fill: true
             }, {
                 label: 'Rejected',
-                data: [<?php echo implode(',', array_reverse(array_column($user_chart_data, 'rejected'))); ?>],
-                backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                data: userRejected,
                 borderColor: '#dc3545',
-                borderWidth: 1
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Pending',
+                data: userPending,
+                borderColor: '#ffc107',
+                backgroundColor: 'rgba(255, 193, 7, 0.08)',
+                tension: 0.4,
+                fill: true
             }]
         },
         options: {
             responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20
-                    }
-                }
-            }
-        }
+            interaction: { intersect: false, mode: 'index' },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } }, x: { grid: { color: 'rgba(0,0,0,0.1)' } } },
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 20 } } }
     });
+
+    // Bar chart
+    const userBarCtx = document.getElementById('userBarChart').getContext('2d');
+    new Chart(userBarCtx, {
+        type: 'bar',
+        data: {
+            labels: userLabels,
+            datasets: [{
+                label: 'Total Requests',
+                data: userTotal,
+                backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                borderColor: '#28a745',
+                borderWidth: 1
+            }, {
+                label: 'Approved',
+                data: userApproved,
+                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                borderColor: '#007bff',
+                borderWidth: 1
+            }, {
+                label: 'Rejected',
+                data: userRejected,
+                backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                borderColor: '#dc3545',
+                borderWidth: 1
+            }, {
+                label: 'Pending',
+                data: userPending,
+                backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                borderColor: '#ffc107',
+                borderWidth: 1
+            }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } }, x: { grid: { color: 'rgba(0,0,0,0.1)' } } }, plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 20 } } } });
     <?php endif; ?>
 
 // Quick request functionality

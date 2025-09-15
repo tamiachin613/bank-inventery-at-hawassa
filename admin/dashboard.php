@@ -48,14 +48,15 @@ $recent_requests = $stmt->fetchAll();
 $stmt = $pdo->query("SELECT * FROM items WHERE quantity < 10 ORDER BY quantity ASC");
 $low_stock_items = $stmt->fetchAll();
 
-// Monthly request statistics for chart
+// Monthly request statistics for chart (use CASE WHEN for compatibility)
 $stmt = $pdo->query("
     SELECT 
         DATE_FORMAT(created_at, '%Y-%m') as month,
         DATE_FORMAT(created_at, '%M %Y') as month_name,
         COUNT(*) as total_requests,
-        SUM(status = 'approved') as approved_requests,
-        SUM(status = 'rejected') as rejected_requests
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_requests,
+        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_requests,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_requests
     FROM requests
     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
     GROUP BY DATE_FORMAT(created_at, '%Y-%m')
@@ -404,17 +405,24 @@ include '../includes/header.php';
         <?php if (!empty($monthly_stats)): ?>
         <div class="row">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Monthly Request Statistics
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="monthlyChart" height="100"></canvas>
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-line me-2"></i>Monthly Request Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <canvas id="monthlyLineChart" height="120"></canvas>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <canvas id="monthlyBarChart" height="120"></canvas>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -500,31 +508,44 @@ include '../includes/header.php';
 
 <script>
     <?php if (!empty($monthly_stats)): ?>
-    // Monthly Chart
-    const ctx = document.getElementById('monthlyChart').getContext('2d');
-    new Chart(ctx, {
+    // Monthly Line Chart
+    const lineCtx = document.getElementById('monthlyLineChart').getContext('2d');
+    const labels = [<?php echo "'" . implode("','", array_reverse(array_column($monthly_stats, 'month_name'))) . "'"; ?>];
+    const totalData = [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'total_requests'))); ?>];
+    const approvedData = [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'approved_requests'))); ?>];
+    const rejectedData = [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'rejected_requests'))); ?>];
+    const pendingData = [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'pending_requests'))); ?>];
+
+    new Chart(lineCtx, {
         type: 'line',
         data: {
-            labels: [<?php echo "'" . implode("','", array_reverse(array_column($monthly_stats, 'month_name'))) . "'"; ?>],
+            labels: labels,
             datasets: [{
                 label: 'Total Requests',
-                data: [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'total_requests'))); ?>],
+                data: totalData,
                 borderColor: '#28a745',
                 backgroundColor: 'rgba(40, 167, 69, 0.1)',
                 tension: 0.4,
                 fill: true
             }, {
                 label: 'Approved',
-                data: [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'approved_requests'))); ?>],
+                data: approvedData,
                 borderColor: '#007bff',
                 backgroundColor: 'rgba(0, 123, 255, 0.1)',
                 tension: 0.4,
                 fill: true
             }, {
                 label: 'Rejected',
-                data: [<?php echo implode(',', array_reverse(array_column($monthly_stats, 'rejected_requests'))); ?>],
+                data: rejectedData,
                 borderColor: '#dc3545',
                 backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Pending',
+                data: pendingData,
+                borderColor: '#ffc107',
+                backgroundColor: 'rgba(255, 193, 7, 0.08)',
                 tension: 0.4,
                 fill: true
             }]
@@ -563,6 +584,55 @@ include '../includes/header.php';
                     borderColor: 'rgba(255,255,255,0.1)',
                     borderWidth: 1
                 }
+            }
+        }
+    });
+
+    // Monthly Bar Chart
+    const barCtx = document.getElementById('monthlyBarChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Requests',
+                data: totalData,
+                backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                borderColor: '#28a745',
+                borderWidth: 1
+            }, {
+                label: 'Approved',
+                data: approvedData,
+                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                borderColor: '#007bff',
+                borderWidth: 1
+            }, {
+                label: 'Rejected',
+                data: rejectedData,
+                backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                borderColor: '#dc3545',
+                borderWidth: 1
+            }, {
+                label: 'Pending',
+                data: pendingData,
+                backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                borderColor: '#ffc107',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.1)' }
+                },
+                x: {
+                    grid: { color: 'rgba(0,0,0,0.1)' }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', labels: { usePointStyle: true, padding: 20 } }
             }
         }
     });
